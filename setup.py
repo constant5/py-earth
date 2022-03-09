@@ -98,7 +98,7 @@ def get_ext_modules():
 def setup_package():
     # Create a dictionary of arguments for setup
     setup_args = {
-        'name': 'sklearn-contrib-py-earth',
+        'name': 'sklearn-contrib-py-earth-stellar',
         'version': versioneer.get_version(),
         'author': 'Jason Rudy',
         'author_email': 'jcrudy@gmail.com',
