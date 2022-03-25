@@ -136,7 +136,7 @@ def setup_package():
                            'dev': ['cython'],
                            'export': ['sympy'],
                            'all_tests': ['pandas', 'statsmodels', 'patsy', 'sympy']},
-        'setup_requires': ['numpy'],
+        #'setup_requires': ['numpy'], # REMOVE TO PREVENT LEGACY INSTALL
         'include_package_data': True
     }
 
