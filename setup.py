@@ -136,7 +136,7 @@ def setup_package():
                            'dev': ['cython'],
                            'export': ['sympy'],
                            'all_tests': ['pandas', 'statsmodels', 'patsy', 'sympy']},
-        #'setup_requires': ['numpy'], # REMOVE TO PREVENT LEGACY INSTALL
+        #'setup_requires': ['numpy'], # Numpy build dependency handled by pyproject.toml--see Redmine 32279
         'include_package_data': True
     }
 
