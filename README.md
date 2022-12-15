@@ -23,11 +23,22 @@ If there are other features or improvements you'd like to see in py-earth, pleas
 
 ## Installation
 
-Make sure you have numpy and scikit-learn installed.  Then do the following:
+First, you will need some way to build the functionality that's implemented in C.
+On Linux, this can be achieved by installing any modern version of gcc. 
+On Windows, if you do not already have Visual Studio installed 
+you can download the MSVC Build Tools package that's available
+here: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+Download and install the executable. When the installer prompts for 
+installation options, you will need to select at minimum the 
+"MSVC C++ x64/x86 build tools" and "Windows SDK" options, 
+which should be selected by default. 
+
+Make sure you also have numpy and scikit-learn installed.  
+Once you've met all the requirements above, open a command line
+to the "py-earth" directory (it should have "setup.py" within it) 
+and run the following:
 
 ```
-git clone git://github.com/scikit-learn-contrib/py-earth.git
-cd py-earth
 sudo python setup.py install
 ```
 
