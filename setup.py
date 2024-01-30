@@ -99,7 +99,7 @@ def setup_package():
     # Create a dictionary of arguments for setup
     setup_args = {
         'name': 'sklearn-contrib-py-earth-stellar',
-        'version': versioneer.get_version(),
+        'version': '2.2.0', # HACK! should be versioneer.get_version() but that was returning an emptry string in some contexts.
         'author': 'Jason Rudy',
         'author_email': 'jcrudy@gmail.com',
         'packages': find_packages(),
