@@ -1,4 +1,4 @@
-# distutils: language = c
+# cython: language_level=3
 # cython: cdivision = True
 # cython: boundscheck = False
 # cython: wraparound = False
@@ -48,8 +48,8 @@ cdef class Record:
 
     cpdef FLOAT_t gcv(Record self, INDEX_t iteration):
         cdef Iteration it = self.iterations[iteration]
-        cdef FLOAT_t mse = it.mse
-        return gcv(mse, it.get_size(), self.num_samples, self.penalty)
+        cdef FLOAT_t mse = <FLOAT_t> it.mse
+        return gcv(mse, <FLOAT_t> it.get_size(),  <FLOAT_t> self.num_samples, self.penalty)
 
     cpdef FLOAT_t rsq(Record self, INDEX_t iteration):
         # gcv(self.sst,1,self.num_samples,self.penalty)
@@ -57,12 +57,12 @@ cdef class Record:
         # gcv(self.mse(iteration):,self.iterations[iteration].get_size(),
         #        self.num_samples,self.penalty)#self.gcv(iteration)
         cdef FLOAT_t mse = self.mse(iteration)
-        return 1 - (mse / mse0)
+        return <FLOAT_t> 1 - (mse / mse0)
 
     cpdef FLOAT_t grsq(Record self, INDEX_t iteration):
         cdef FLOAT_t gcv0 = gcv(self.sst, 1, self.num_samples, self.penalty)
         cdef FLOAT_t gcv_ = self.gcv(iteration)
-        return 1 - (gcv_ / gcv0)
+        return <FLOAT_t> 1 - (gcv_ / gcv0)
 
 cdef class PruningPassRecord(Record):
     def __init__(PruningPassRecord self, INDEX_t num_samples,
@@ -101,7 +101,7 @@ cdef class PruningPassRecord(Record):
         return self.selected
 
     cpdef roll_back(PruningPassRecord self, Basis basis):
-        cdef INDEX_t n = len(self.iterations)
+        cdef INDEX_t n = <INDEX_t> len(self.iterations)
         cdef INDEX_t i
         for i in range(n - self.selected - 1):
             basis[self.iterations[n - i - 1].get_pruned()].unprune()
@@ -135,7 +135,7 @@ cdef class ForwardPassRecord(Record):
         self.num_variables = num_variables
         self.penalty = penalty
         self.sst = sst
-        self.iterations = [FirstForwardPassIteration(self.sst)]
+        self.iterations = [FirstForwardPassIteration(<FLOAT_t>self.sst)]
         self.xlabels = xlabels
     
     def __reduce__(ForwardPassRecord self):
@@ -217,10 +217,10 @@ cdef class Iteration:
                 self._getstate() == other._getstate())
 
     cpdef FLOAT_t get_mse(Iteration self):
-        return self.mse
+        return <FLOAT_t> self.mse
 
     cpdef INDEX_t get_size(Iteration self):
-        return self.size
+        return <INDEX_t> self.size
 
 cdef class PruningPassIteration(Iteration):
     def __init__(PruningPassIteration self,
@@ -244,7 +244,7 @@ cdef class PruningPassIteration(Iteration):
         self.mse = state['mse']
 
     cpdef INDEX_t get_pruned(PruningPassIteration self):
-        return self.pruned
+        return <INDEX_t> self.pruned
 
     def __str__(PruningPassIteration self):
         result = '%s\t%s\t%s' % (str(self.pruned), self.size, '%.2f' %

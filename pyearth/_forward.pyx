@@ -1,20 +1,27 @@
-# distutils: language = c
+# cython: language_level=3
 # cython: cdivision = True
 # cython: boundscheck = False
 # cython: wraparound = False
 # cython: profile = False
+
+if 1:
+    cnp.import_array()
+
+from ._types cimport FLOAT_t, INT_t, INDEX_t, BOOL_t
 
 from ._util cimport gcv_adjust, log2, apply_weights_1d, apply_weights_slice
 from ._basis cimport (Basis, BasisFunction, ConstantBasisFunction,
                       HingeBasisFunction, LinearBasisFunction, 
                       MissingnessBasisFunction)
 from ._record cimport ForwardPassIteration
-from ._types import BOOL, INT
+from ._types import BOOL, INT, FLOAT
 from ._knot_search cimport knot_search, MultipleOutcomeDependentData, PredictorDependentData, \
     KnotSearchReadOnlyData, KnotSearchState, KnotSearchWorkingData, KnotSearchData
 import sys
 from libc.math cimport sqrt, abs, log
+
 import numpy as np
+cimport numpy as cnp
 cnp.import_array()
 
 from heapq import heappush, heappop
@@ -68,8 +75,8 @@ cdef class ForwardPasser:
         # Assuming Earth.fit got capital W (the inverse of squared variance)
         # so the objective function is (sqrt(W) * residual) ^ 2)
         self.sample_weight = np.sqrt(sample_weight)
-        self.m = self.X.shape[0]
-        self.n = self.X.shape[1]
+        self.m = <INDEX_t> self.X.shape[0]
+        self.n = <INDEX_t> self.X.shape[1]
         self.endspan       = kwargs.get('endspan', -1)
         self.minspan       = kwargs.get('minspan', -1)
         self.endspan_alpha = kwargs.get('endspan_alpha', .05)
@@ -108,16 +115,16 @@ cdef class ForwardPasser:
             content = FastHeapContent(idx=0)
             heappush(self.fast_heap, content)
             
-        self.mwork = np.empty(shape=self.m, dtype=np.int)
+        self.mwork = np.empty(shape=self.m, dtype=INT)
         
         self.B = np.ones(
-            shape=(self.m, self.max_terms + 4), order='F', dtype=np.float)
+            shape=(self.m, self.max_terms + 4), order=b'F')
         self.basis.transform(self.X, self.missing, self.B[:,0:1])
         
         if self.endspan < 0:
             self.endspan = round(3 - log2(self.endspan_alpha / self.n))
         
-        self.linear_variables = np.zeros(shape=self.n, dtype=INT)
+        self.linear_variables = np.zeros(shape=self.n, dtype=float)
         self.init_linear_variables()
         
         # Removed in favor of new knot search code
@@ -134,9 +141,9 @@ cdef class ForwardPasser:
                     'Unknown variable selected in linvars argument.')
         
         # Initialize the data structures for knot search
-        self.n_outcomes = self.y.shape[1]
-        n_predictors = self.X.shape[1]
-        n_weights = self.sample_weight.shape[1]
+        self.n_outcomes = <INDEX_t> self.y.shape[1]
+        n_predictors =  <INDEX_t> self.X.shape[1]
+        n_weights =  <INDEX_t> self.sample_weight.shape[1]
         self.workings = []
         self.outcome = MultipleOutcomeDependentData.alloc(self.y, self.sample_weight, self.m, 
                                                           self.n_outcomes, self.max_terms + 4, 
@@ -150,7 +157,7 @@ cdef class ForwardPasser:
         self.predictors = []
         for i in range(n_predictors):
             x = self.X[:, i].copy()
-            x[missing[:,i]==1] = 0.
+            x[missing[:,i]==1] = <FLOAT_t> 0.
             predictor = PredictorDependentData.alloc(x)
             self.predictors.append(predictor)
         
@@ -163,16 +170,16 @@ cdef class ForwardPasser:
 
     cpdef init_linear_variables(ForwardPasser self):
         cdef INDEX_t variable
-        cdef cnp.ndarray[INT_t, ndim = 1] order
-        cdef cnp.ndarray[INT_t, ndim = 1] linear_variables = (
-            <cnp.ndarray[INT_t, ndim = 1] > self.linear_variables)
+        cdef cnp.ndarray[long long, ndim = 1] order
+        cdef cnp.ndarray[FLOAT_t, ndim = 1] linear_variables = (
+            <cnp.ndarray[FLOAT_t, ndim = 1] > self.linear_variables)
         cdef cnp.ndarray[FLOAT_t, ndim = 2] B = (
             <cnp.ndarray[FLOAT_t, ndim = 2] > self.B)
         cdef cnp.ndarray[FLOAT_t, ndim = 2] X = (
             <cnp.ndarray[FLOAT_t, ndim = 2] > self.X)
         cdef ConstantBasisFunction root_basis_function = self.basis[0]
         for variable in range(self.n):
-            order = np.argsort(X[:, variable])[::-1].astype(np.int)
+            order = np.argsort(X[:, variable])[::-1]
             if root_basis_function.valid_knots(B[order, 0], X[order, variable],
                                                variable, self.check_every,
                                                self.endspan, self.minspan,
@@ -185,7 +192,7 @@ cdef class ForwardPasser:
     cpdef run(ForwardPasser self):
         if self.verbose >= 1:
             print('Beginning forward pass')
-            print(self.record.partial_str(slice(-1, None, None), print_footer=False))
+            print(self.record.partial_str(slice(<INT_t> -1, None, None), print_footer=False))
         if self.max_terms > 1 and self.record.mse(0) != 0.:
             while True:
                 self.next_pair()
@@ -248,7 +255,7 @@ cdef class ForwardPasser:
         cdef INDEX_t parent_degree
         cdef INDEX_t nonzero_count
         cdef BasisFunction parent
-        cdef cnp.ndarray[INDEX_t, ndim = 1] candidates_idx
+        cdef cnp.ndarray[INT_t, ndim = 1] candidates_idx
         cdef FLOAT_t knot
         cdef FLOAT_t mse
         cdef INDEX_t knot_idx
@@ -266,19 +273,19 @@ cdef class ForwardPasser:
         cdef INDEX_t variable_choice
         cdef bint first = True
         cdef bint already_covered
-        cdef INDEX_t k = len(self.basis)
+        cdef INDEX_t k = <INDEX_t> len(self.basis)
         cdef INDEX_t endspan
         cdef bint linear_dependence
         cdef bint dependent
         # TODO: Shouldn't there be weights here?
-        cdef FLOAT_t gcv_factor_k_plus_1 = gcv_adjust(k + 1, self.m,
-                                                      self.penalty)
-        cdef FLOAT_t gcv_factor_k_plus_2 = gcv_adjust(k + 2, self.m,
-                                                      self.penalty)
-        cdef FLOAT_t gcv_factor_k_plus_3 = gcv_adjust(k + 3, self.m,
-                                                      self.penalty)
-        cdef FLOAT_t gcv_factor_k_plus_4 = gcv_adjust(k + 4, self.m,
-                                                      self.penalty)
+        cdef FLOAT_t gcv_factor_k_plus_1 = <FLOAT_t> gcv_adjust(<FLOAT_t> (k + 1), <FLOAT_t> self.m,
+                                                      <FLOAT_t> self.penalty)
+        cdef FLOAT_t gcv_factor_k_plus_2 = <FLOAT_t> gcv_adjust(<FLOAT_t> (k + 2), <FLOAT_t> self.m,
+                                                      <FLOAT_t> self.penalty)
+        cdef FLOAT_t gcv_factor_k_plus_3 = <FLOAT_t> gcv_adjust(<FLOAT_t> (k + 3), <FLOAT_t> self.m,
+                                                      <FLOAT_t> self.penalty)
+        cdef FLOAT_t gcv_factor_k_plus_4 = <FLOAT_t> gcv_adjust(<FLOAT_t> (k + 4), <FLOAT_t> self.m,
+                                                      <FLOAT_t> self.penalty)
         cdef FLOAT_t gcv_
         cdef FLOAT_t mse_
         cdef INDEX_t i
@@ -293,8 +300,8 @@ cdef class ForwardPasser:
             <cnp.ndarray[BOOL_t, ndim = 2] > self.missing)
         cdef cnp.ndarray[FLOAT_t, ndim = 2] B = (
             <cnp.ndarray[FLOAT_t, ndim = 2] > self.B)
-        cdef cnp.ndarray[INT_t, ndim = 1] linear_variables = (
-            <cnp.ndarray[INT_t, ndim = 1] > self.linear_variables)
+        cdef cnp.ndarray[FLOAT_t, ndim = 1] linear_variables = (
+            <cnp.ndarray[FLOAT_t, ndim = 1] > self.linear_variables)
         cdef cnp.ndarray[BOOL_t, ndim = 1] has_missing = (
             <cnp.ndarray[BOOL_t, ndim = 1] > self.has_missing)
         cdef cnp.ndarray[FLOAT_t, ndim = 1] b
@@ -313,11 +320,11 @@ cdef class ForwardPasser:
                 # retrieve the next basis function to try as parent
                 parent_basis_content = heappop(self.fast_heap)
                 content_to_be_repushed.append(parent_basis_content)
-                parent_idx = parent_basis_content.idx
+                parent_idx = <INDEX_t> parent_basis_content.idx
                 mse_choice_cur_parent = -1
                 variable_choice_cur_parent = -1
             else:
-                parent_idx = idx
+                parent_idx = <INDEX_t>  idx
 
             parent = self.basis.get(parent_idx)
             if not parent.is_splittable():
@@ -425,7 +432,7 @@ cdef class ForwardPasser:
 
                         # Run knot search
                         knot, knot_idx, mse = knot_search(search_data, candidates, p, q, 
-                                                          self.m, len(candidates), self.n_outcomes,
+                                                          self.m, <INDEX_t> len(candidates), self.n_outcomes,
                                                           self.verbose)
                         mse /= self.total_weight
                         knot_idx = candidates_idx[knot_idx]

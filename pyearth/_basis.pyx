@@ -8,8 +8,9 @@ from ._util cimport log2, apply_weights_2d
 from libc.math cimport log
 from libc.math cimport abs
 cimport cython
-cdef FLOAT_t ZERO_TOL = 1e-16
-from _types import FLOAT
+
+from ._types import FLOAT
+cdef FLOAT_t ZERO_TOL = <FLOAT_t> 1e-16
 import numpy as np
 import sys
 import six
@@ -34,7 +35,7 @@ cdef class BasisFunction:
         '''
         Modifies translation in place.
         '''
-        cdef INDEX_t i, n = len(self.children)
+        cdef INDEX_t i, n = <INDEX_t>  len(self.children)
         translation[self] = self._smoothed_version(self.get_parent(), knot_dict,
                                                    translation)
         for i in range(n):
@@ -133,7 +134,7 @@ cdef class BasisFunction:
 
     cpdef _add_child(BasisFunction self, BasisFunction child):
         '''Called by _set_parent.'''
-        cdef INDEX_t n = len(self.children)
+        cdef INDEX_t n = <INDEX_t>  len(self.children)
         self.children.append(child)
         cdef int var = child.get_variable()
         if var in self.child_map:
@@ -142,7 +143,7 @@ cdef class BasisFunction:
             self.child_map[var] = [n]
 
     cpdef BasisFunction get_parent(BasisFunction self):
-        return self.parent
+        return  <BasisFunction>self.parent
 
     cpdef prune(BasisFunction self):
         self.pruned = True
@@ -158,7 +159,7 @@ cdef class BasisFunction:
             children = self.child_map[variable]
         else:
             return []
-        cdef INDEX_t n = len(children)
+        cdef INDEX_t n = <INDEX_t>  len(children)
         cdef INDEX_t i
         cdef list result = []
         cdef int idx
@@ -196,7 +197,7 @@ cdef class BasisFunction:
         cnp.ndarray[FLOAT_t, ndim=1] variable, int variable_idx,
         INDEX_t check_every,
         int endspan, int minspan,
-        FLOAT_t minspan_alpha, INDEX_t n,
+        FLOAT_t minspan_alpha, int n,
         cnp.ndarray[INT_t, ndim=1] workspace):
         '''
         values - The unsorted values of self in the data set
@@ -208,19 +209,20 @@ cdef class BasisFunction:
         cdef INDEX_t i
         cdef INDEX_t j
         cdef INDEX_t k
-        cdef INDEX_t m = values.shape[0]
-        cdef FLOAT_t float_tmp
+        cdef INDEX_t m = <INDEX_t> values.shape[0]
+        cdef FLOAT_t floatmp
         cdef INT_t int_tmp
         cdef INDEX_t count
-        cdef int minspan_
+        cdef INT_t minspan_
         cdef cnp.ndarray[INT_t, ndim = 1] result
         cdef INDEX_t num_used
         cdef INDEX_t prev
         cdef INDEX_t start
-        cdef int idx
-        cdef int last_idx
+        cdef INT_t idx
+        cdef INT_t last_idx
         cdef FLOAT_t first_var_value = variable[m - 1]
         cdef FLOAT_t last_var_value = variable[m - 1]
+        cdef FLOAT_t temp_result
 
         # Calculate the used knots
         cdef list used_knots = self.knots(variable_idx)
@@ -243,13 +245,13 @@ cdef class BasisFunction:
 
         # Calculate minspan
         if minspan < 0:
-            minspan_ = <int > (-log2(-(1.0 / (n * count)) *
-                                log(1.0 - minspan_alpha)) / 2.5)
+            temp_result = <FLOAT_t> (-log2( -( 1.0 / (n * count)) * log((1.0 - minspan_alpha))) /  2.5)
+            minspan_ = <int > temp_result
         else:
-            minspan_ = minspan
+            minspan_ = <int> minspan
 
         # Take out the used points and apply minspan
-        num_used = len(used_knots)
+        num_used = <INDEX_t> len(used_knots)
         prev = 0
         last_idx = -1
         for i in range(num_used):
@@ -485,7 +487,7 @@ cdef class DataVariableBasisFunction(VariableBasisFunction):
                   function.  Otherwise, recurse to compute parent function.
         '''
         cdef INDEX_t i # @DuplicatedSignature
-        cdef INDEX_t m = len(b)  # @DuplicatedSignature
+        cdef INDEX_t m = <INDEX_t>  len(b)  # @DuplicatedSignature
         cdef cnp.ndarray[FLOAT_t, ndim=1] val
         if recurse:
             self.parent.apply(X, missing, b, recurse=True)
@@ -507,7 +509,7 @@ cdef class DataVariableBasisFunction(VariableBasisFunction):
         j - result vector
         '''
         cdef INDEX_t i, this_var = self.get_variable()  # @DuplicatedSignature
-        cdef INDEX_t m = len(b)  # @DuplicatedSignature
+        cdef INDEX_t m = <INDEX_t>  len(b)  # @DuplicatedSignature
         cdef FLOAT_t x
         self.parent.apply_deriv(X, missing, b, j, var)
         here =  missing[:, self.variable] == 0
@@ -587,7 +589,7 @@ cdef class MissingnessBasisFunction(VariableBasisFunction):
         j - result vector
         '''
         cdef INDEX_t i, this_var = self.get_variable()  # @DuplicatedSignature
-        cdef INDEX_t m = len(b)  # @DuplicatedSignature
+        cdef INDEX_t m = <INDEX_t>  len(b)  # @DuplicatedSignature
         cdef FLOAT_t x
         self.parent.apply_deriv(X, missing, b, j, var)
         if self.complement:
@@ -696,11 +698,11 @@ cdef class SmoothedHingeBasisFunction(HingeBasisFunctionBase):
         p_denom *= p_denom
         r_denom *= p_denom
         if not self.reverse:
-            self.p = (2*self.knot_plus + self.knot_minus - 3*self.knot) / p_denom
-            self.r = (2*self.knot - self.knot_plus - self.knot_minus) / r_denom
+            self.p = <FLOAT_t > ((2*self.knot_plus + self.knot_minus - 3*self.knot)) / p_denom
+            self.r = <FLOAT_t > ((2*self.knot - self.knot_plus - self.knot_minus)) / r_denom
         else:
-            self.p = (3*self.knot - 2*self.knot_minus - self.knot_plus) / p_denom
-            self.r = -1*(self.knot_minus + self.knot_plus - 2*self.knot) / r_denom
+            self.p = <FLOAT_t > ((3*self.knot - 2*self.knot_minus - self.knot_plus) )/ p_denom
+            self.r = <FLOAT_t > (-1*(self.knot_minus + self.knot_plus - 2*self.knot) )/ r_denom
 
     cpdef get_p(SmoothedHingeBasisFunction self):
         return self.p
@@ -952,7 +954,7 @@ cdef class Basis:
 
     def __str__(Basis self):
         cdef INDEX_t i
-        cdef INDEX_t n = len(self)
+        cdef INDEX_t n = <INDEX_t>  len(self)
         result = ''
         for i in range(n):
             result += str(self[i])
@@ -966,7 +968,7 @@ cdef class Basis:
         '''
         See section 3.5, Friedman, 1991
         '''
-        cdef INDEX_t bf_idx, n_bf = len(self)
+        cdef INDEX_t bf_idx, n_bf = <INDEX_t>  len(self)
         cdef dict result = {}
         cdef frozenset vars
         cdef BasisFunction bf
@@ -1088,15 +1090,15 @@ cdef class Basis:
         cdef INDEX_t i, j_, m, n
 
         # Zero out J if necessary
-        m = J.shape[0]
-        n = J.shape[1]
-        p = J.shape[2]
+        m = <INDEX_t> J.shape[0]
+        n = <INDEX_t> J.shape[1]
+        p = <INDEX_t> J.shape[2]
         if not prezeroed_j:
             for j_ in range(n):
                 for i in range(m):
                     for p_ in range(p):
                         J[i, j_, p_] = 0.0
-        cdef INDEX_t var, bf_idx, coef_idx, n_bfs = len(self)
+        cdef INDEX_t var, bf_idx, coef_idx, n_bfs = <INDEX_t>  len(self)
         cdef set variables
 
         for p_ in range(p):

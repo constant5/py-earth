@@ -1,4 +1,4 @@
-# distutils: language = c
+# cython: language_level=3
 # cython: cdivision = True
 # cython: boundscheck = False
 # cython: wraparound = False
@@ -8,34 +8,34 @@ import numpy as np
 from libc.math cimport sqrt, log
 
 cdef FLOAT_t log2(FLOAT_t x):
-    return log(x) / log(2.0)
+    return log(x) / log(<FLOAT_t>2.0)
 
 cpdef apply_weights_2d(cnp.ndarray[FLOAT_t, ndim=2] B,
                        cnp.ndarray[FLOAT_t, ndim=1] weights):
     cdef INDEX_t i
     cdef INDEX_t j
-    cdef INDEX_t m = B.shape[0]
-    cdef INDEX_t n = B.shape[1]
+    cdef INDEX_t m = <INDEX_t> B.shape[0]
+    cdef INDEX_t n = <INDEX_t> B.shape[1]
     for i in range(m):
         for j in range(n):
-            B[i, j] *= sqrt(weights[i])
+            B[i, j] *= <FLOAT_t> sqrt(weights[i])
 
 cpdef apply_weights_slice(cnp.ndarray[FLOAT_t, ndim=2] B,
                           cnp.ndarray[FLOAT_t, ndim=1] weights,
                           INDEX_t column):
     cdef INDEX_t i
     cdef INDEX_t j
-    cdef INDEX_t m = B.shape[0]
-    cdef INDEX_t n = B.shape[1]
+    cdef INDEX_t m = <INDEX_t> B.shape[0]
+    cdef INDEX_t n = <INDEX_t> B.shape[1]
     for i in range(m):
-        B[i, column] *= sqrt(weights[i])
+        B[i, column] *= <FLOAT_t> sqrt(weights[i])
 
 cpdef apply_weights_1d(cnp.ndarray[FLOAT_t, ndim=1] y,
                        cnp.ndarray[FLOAT_t, ndim=1] weights):
     cdef INDEX_t i
-    cdef INDEX_t m = y.shape[0]
+    cdef INDEX_t m = <INDEX_t> y.shape[0]
     for i in range(m):
-        y[i] *= sqrt(weights[i])
+        y[i] *= <FLOAT_t> sqrt(weights[i])
 
 cpdef FLOAT_t gcv(FLOAT_t mse, FLOAT_t basis_size, FLOAT_t data_size,
                   FLOAT_t penalty):
@@ -44,8 +44,8 @@ cpdef FLOAT_t gcv(FLOAT_t mse, FLOAT_t basis_size, FLOAT_t data_size,
 cpdef FLOAT_t gcv_adjust(FLOAT_t basis_size, FLOAT_t data_size,
                          FLOAT_t penalty):
     cdef FLOAT_t effective_parameters
-    effective_parameters = basis_size + penalty * (basis_size - 1) / 2.0
-    return 1.0 / ( ( (1.0 - (effective_parameters / data_size)) ** 2 ) )
+    effective_parameters = basis_size + penalty * (basis_size - <FLOAT_t> 1) / <FLOAT_t> 2.0
+    return <FLOAT_t> 1.0 / ( ( (<FLOAT_t> 1.0 - (effective_parameters / data_size)) ** <FLOAT_t> 2 ) )
 
 cpdef str_pad(string, length):
     if len(string) >= length:
@@ -58,8 +58,9 @@ cpdef ascii_table(header, data, print_header=True, print_footer=True):
     header - list of strings representing the header row
     data - list of lists of strings representing data rows
     '''
-    m = len(data)
-    n = len(header)
+    cdef INDEX_t i, j
+    cdef INDEX_t m = <INDEX_t> len(data)  
+    cdef INDEX_t n = <INDEX_t> len(header)
     column_widths = [len(head) for head in header]
     for i, row in enumerate(data):
         for j, col in enumerate(row):

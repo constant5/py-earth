@@ -1,4 +1,4 @@
-# distutils: language = c
+# cython: language_level=3
 # cython: cdivision = True
 # cython: boundscheck = False
 # cython: wraparound = False
@@ -7,7 +7,7 @@ import numpy as np
 from scipy.linalg.cython_lapack cimport dlarfg, dlarft, dlarfb
 from scipy.linalg.cython_blas cimport dcopy
 from libc.math cimport abs
-from _types import BOOL, FLOAT
+from ._types import BOOL, FLOAT
 
 cdef class UpdatingQT:
     def __init__(UpdatingQT self, int m, int max_n, Householder householder, 
@@ -32,13 +32,12 @@ cdef class UpdatingQT:
         # accordingly
         
         # Zero out the new row of Q_t
-        cdef FLOAT_t zero = 0.
+        cdef double zero = 0.
         cdef int zero_int = 0
         cdef int N = self.m
-        cdef FLOAT_t * y = <FLOAT_t *> &(self.Q_t[self.k, 0])
-        cdef int incy = self.max_n
-        dcopy(&N, &zero, &zero_int, y, &incy)
-        
+        dcopy(&N,  &zero, &zero_int, <double *> &(self.Q_t[self.k, 0]), &self.max_n)
+
+            
         if not dependent:
             
             # Place a one in the right place
@@ -118,17 +117,16 @@ cdef class Householder:
     cpdef bint update_from_column(Householder self, FLOAT_t[:] c):
         # Copies c, applies self, then updates V and T
         
-        # Copy c into V
         cdef int N = self.m
-        cdef FLOAT_t * x = <FLOAT_t *> &(c[0])
-        cdef int incx = c.strides[0] / c.itemsize
-        cdef FLOAT_t * y = <FLOAT_t *> &(self.V[0, self.k])
+        cdef int incx = c.strides[0] // c.itemsize
         cdef int incy = 1
-        dcopy(&N, x, &incx, y, &incy)
-        
-        # Apply self to new column in V
-        self.left_apply_transpose(self.V[:, self.k:self.k+1])
-        
+
+        # Cast FLOAT_t to double for compatibility with dcopy
+        dcopy(&N, <double *> &c[0], &incx, <double *> &(self.V[0, self.k]), &incy)
+
+        # Apply self to the new column in V
+        self.left_apply_transpose(self.V[:, self.k:self.k + 1])
+
         # Update V and T (increments k)
         return self.update_v_t()
         
@@ -137,15 +135,15 @@ cdef class Householder:
         # Assume relevant data has been copied into self.V correctly, as by 
         # update_from_column.  Update V and T appropriately.
         cdef int n = self.m - self.k
-        cdef FLOAT_t alpha = self.V[self.k, self.k]
-        cdef FLOAT_t* x = <FLOAT_t *> &(self.V[(self.k + 1), self.k])
+        cdef double alpha = self.V[self.k, self.k]
+        cdef double* x = <double *> &(self.V[(self.k + 1), self.k])
         cdef int incx = self.V.strides[0] // self.V.itemsize
-        cdef FLOAT_t tau
-        cdef FLOAT_t beta
+        cdef double tau
+        cdef double beta
         cdef bint dependent
         
         # Compute the householder reflection
-        dlarfg(&n, &alpha, x, &incx, &tau)
+        dlarfg(&n, &alpha, x, &incx,  &tau)
         beta = alpha
         
         # If beta is very close to zero, the new column was linearly
@@ -167,14 +165,14 @@ cdef class Householder:
         self.V[:self.k, self.k] = 0.
         self.tau[self.k] = tau
         self.beta[self.k] = alpha
-        cdef char direct = 'F'
-        cdef char storev = 'C'
+        cdef char direct = b'F'
+        cdef char storev = b'C'
         n = self.m
         cdef int k = self.k + 1
-        cdef FLOAT_t * V = <FLOAT_t *> &(self.V[0,0])
+        cdef double * V = <double *> &(self.V[0,0])
         cdef int ldv = self.m
-        cdef FLOAT_t * T = <FLOAT_t *> &(self.T[0,0])
-        cdef FLOAT_t * tau_arg = <FLOAT_t *> &(self.tau[0])
+        cdef double * T = <double *> &(self.T[0,0])
+        cdef double * tau_arg = <double *> &(self.tau[0])
         cdef int ldt = self.max_n
         dlarft(&direct, &storev, &n, &k, V, &ldv, tau_arg, T, &ldt)
         
@@ -183,82 +181,82 @@ cdef class Householder:
         return dependent 
         
     cpdef void left_apply(Householder self, FLOAT_t[::1, :] C):
-        cdef char side = 'L'
-        cdef char trans = 'N'
-        cdef char direct = 'F'
-        cdef char storev = 'C'
-        cdef int M = C.shape[0]
-        cdef int N = C.shape[1]
+        cdef char side = b'L'
+        cdef char trans = b'N'
+        cdef char direct = b'F'
+        cdef char storev = b'C'
+        cdef int M = <int> C.shape[0]
+        cdef int N =<int> C.shape[1]
         cdef int K = self.k
-        cdef FLOAT_t * V = <FLOAT_t *> &(self.V[0, 0])
+        cdef double * V = <double *> &(self.V[0, 0])  # Cast to double *
         cdef int ldv = self.m
-        cdef FLOAT_t * T = <FLOAT_t *> &(self.T[0, 0])
+        cdef double * T = <double *> &(self.T[0, 0])  # Cast to double *
         cdef int ldt = self.max_n
-        cdef FLOAT_t * C_arg = <FLOAT_t *> &(C[0, 0])
+        cdef double * C_arg = <double *> &(C[0, 0])  # Cast to double *
         cdef int ldc = C.strides[1] // C.itemsize
-        cdef FLOAT_t * work = <FLOAT_t *> &(self.work[0,0])
+        cdef double * work = <double *> &(self.work[0, 0])  # Cast to double *
         cdef int ldwork = self.m
         print(C.shape)
-        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, 
-               V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
         
+        # Call dlarfb with casted pointers
+        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
+
     cpdef void left_apply_transpose(Householder self, FLOAT_t[::1, :] C):
-        cdef char side = 'L'
-        cdef char trans = 'T'
-        cdef char direct = 'F'
-        cdef char storev = 'C'
-        cdef int M = C.shape[0]
-        cdef int N = C.shape[1]
+        cdef char side = b'L'
+        cdef char trans = b'T'
+        cdef char direct = b'F'
+        cdef char storev = b'C'
+        cdef int M = <int> C.shape[0]
+        cdef int N = <int> C.shape[1]
         cdef int K = self.k
-        cdef FLOAT_t * V = <FLOAT_t *> &(self.V[0, 0])
+        cdef double * V = <double *> &(self.V[0, 0])  # Cast to double *
         cdef int ldv = self.m
-        cdef FLOAT_t * T = <FLOAT_t *> &(self.T[0, 0])
+        cdef double * T = <double *> &(self.T[0, 0])  # Cast to double *
         cdef int ldt = self.max_n
-        cdef FLOAT_t * C_arg = <FLOAT_t *> &(C[0, 0])
+        cdef double * C_arg = <double *> &(C[0, 0])  # Cast to double *
         cdef int ldc = C.strides[1] // C.itemsize
-        cdef FLOAT_t * work = <FLOAT_t *> &(self.work[0,0])
+        cdef double * work = <double *> &(self.work[0, 0])  # Cast to double *
         cdef int ldwork = self.m
         
-        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, 
-               V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
-    
+        # Call dlarfb with casted pointers
+        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
+
     cpdef void right_apply(Householder self, FLOAT_t[::1, :] C):
-        cdef char side = 'R'
-        cdef char trans = 'N'
-        cdef char direct = 'F'
-        cdef char storev = 'C'
-        cdef int M = C.shape[0]
-        cdef int N = C.shape[1]
+        cdef char side = b'R'
+        cdef char trans = b'N'
+        cdef char direct = b'F'
+        cdef char storev = b'C'
+        cdef int M = <int> C.shape[0]
+        cdef int N = <int> C.shape[1]
         cdef int K = self.k
-        cdef FLOAT_t * V = <FLOAT_t *> &(self.V[0, 0])
+        cdef double * V = <double *> &(self.V[0, 0])  # Cast to double *
         cdef int ldv = self.m
-        cdef FLOAT_t * T = <FLOAT_t *> &(self.T[0, 0])
+        cdef double * T = <double *> &(self.T[0, 0])  # Cast to double *
         cdef int ldt = self.max_n
-        cdef FLOAT_t * C_arg = <FLOAT_t *> &(C[0, 0])
+        cdef double * C_arg = <double *> &(C[0, 0])  # Cast to double *
         cdef int ldc = C.strides[1] // C.itemsize
-        cdef FLOAT_t * work = <FLOAT_t *> &(self.work[0,0])
+        cdef double * work = <double *> &(self.work[0, 0])  # Cast to double *
         cdef int ldwork = self.m
         
-        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, 
-               V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
-        
+        # Call dlarfb with casted pointers
+        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
+
     cpdef void right_apply_transpose(Householder self, FLOAT_t[::1, :] C):
-        cdef char side = 'R'
-        cdef char trans = 'T'
-        cdef char direct = 'F'
-        cdef char storev = 'C'
-        cdef int M = C.shape[0]
-        cdef int N = C.shape[1]
+        cdef char side = b'R'
+        cdef char trans = b'T'
+        cdef char direct = b'F'
+        cdef char storev = b'C'
+        cdef int M = <int> C.shape[0]
+        cdef int N = <int> C.shape[1]
         cdef int K = self.k
-        cdef FLOAT_t * V = <FLOAT_t *> &(self.V[0, 0])
+        cdef double * V = <double *> &(self.V[0, 0])  # Cast to double *
         cdef int ldv = self.m
-        cdef FLOAT_t * T = <FLOAT_t *> &(self.T[0, 0])
+        cdef double * T = <double *> &(self.T[0, 0])  # Cast to double *
         cdef int ldt = self.max_n
-        cdef FLOAT_t * C_arg = <FLOAT_t *> &(C[0, 0])
+        cdef double * C_arg = <double *> &(C[0, 0])  # Cast to double *
         cdef int ldc = C.strides[1] // C.itemsize
-        cdef FLOAT_t * work = <FLOAT_t *> &(self.work[0,0])
+        cdef double * work = <double *> &(self.work[0, 0])  # Cast to double *
         cdef int ldwork = self.m
         
-        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, 
-               V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)
-#         
+        # Call dlarfb with casted pointers
+        dlarfb(&side, &trans, &direct, &storev, &M, &N, &K, V, &ldv, T, &ldt, C_arg, &ldc, work, &ldwork)

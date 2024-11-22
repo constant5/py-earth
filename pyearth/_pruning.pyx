@@ -1,4 +1,4 @@
-# distutils: language = c
+# cython: language_level=3
 # cython: cdivision = True
 # cython: boundscheck = False
 # cython: wraparound = False
@@ -23,13 +23,13 @@ cdef class PruningPasser:
                  **kwargs):
         self.X = X
         self.missing = missing
-        self.m = self.X.shape[0]
-        self.n = self.X.shape[1]
+        self.m = <INDEX_t> self.X.shape[0]
+        self.n = <INDEX_t> self.X.shape[1]
         self.y = y
         self.sample_weight = sample_weight
         self.verbose = verbose
         self.basis = basis
-        self.B = np.empty(shape=(self.m, len(self.basis) + 1), dtype=np.float)
+        self.B = np.empty(shape=(self.m, len(self.basis) + 1), dtype=float)
         self.penalty = kwargs.get('penalty', 3.0)
         if sample_weight.shape[1] == 1:
             y_avg = np.average(self.y, weights=sample_weight[:,0], axis=0)
@@ -52,8 +52,8 @@ cdef class PruningPasser:
         cdef INDEX_t i
         cdef INDEX_t j
         cdef long v
-        cdef INDEX_t basis_size = len(self.basis)
-        cdef INDEX_t pruned_basis_size = self.basis.plen()
+        cdef INDEX_t basis_size = <INDEX_t> len(self.basis)
+        cdef INDEX_t pruned_basis_size = <INDEX_t> self.basis.plen()
         cdef FLOAT_t gcv_
         cdef INDEX_t best_iteration
         cdef INDEX_t best_bf_to_prune
